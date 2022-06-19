@@ -1,10 +1,23 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 [RequireComponent(typeof(LineRenderer))]
 public class Edge : AccessBehaviour, IGraphPart
 {
+    public int ID;
+    private int toStopMovement;
+
+    public Gradient colorTwoConnected;
+    public Gradient colorOneConnected;
+
+    public Tuple<string, string> Name
+    {
+        get { return new Tuple<string, string>(leftVertex.Name, rightVertex.Name); }
+        set { throw new System.Exception("Prepisovanie edge ID"); }
+    }
+
     private bool isSelected = false;
     private SpriteRenderer selectedSR;
 
@@ -17,17 +30,43 @@ public class Edge : AccessBehaviour, IGraphPart
     private Vector3[] positions;
 
     [HideInInspector]
-    public EdgeEnd leftEdgeEnd;
+    public int leftEdgeEnd;
     [HideInInspector]
-    public EdgeEnd rightEdgeEnd;
+    public int rightEdgeEnd;
     public Vertex leftVertex { 
-        get { return leftEdgeEnd.vertex; }
-        set { leftEdgeEnd.vertex = value; }
+        get { return ((EdgeEnd)IDManager.GetGP(leftEdgeEnd)).GetVertex(); }
+        set { ((EdgeEnd)IDManager.GetGP(leftEdgeEnd)).AttachVertex(value); }
     }
     public Vertex rightVertex
     {
-        get { return rightEdgeEnd.vertex; }
-        set { rightEdgeEnd.vertex = value; }
+        get { return ((EdgeEnd)IDManager.GetGP(rightEdgeEnd)).GetVertex(); }
+        set { ((EdgeEnd)IDManager.GetGP(rightEdgeEnd)).AttachVertex(value); }
+    }
+
+    private void LateUpdate()
+    {
+        if (toStopMovement == 2)
+        {
+            CheckLock();
+            ControlVertices();
+            DrawCurve();
+            CheckColors();
+
+            toStopMovement = 0;
+        } else if (toStopMovement == 1)
+        {
+            toStopMovement++;
+        }
+    }
+
+    public int GetID()
+    {
+        return ID;
+    }
+
+    public void SetID(int id)
+    {
+        ID = id;
     }
 
     public Vertex GetOtherVertex(Vertex v)
@@ -46,22 +85,21 @@ public class Edge : AccessBehaviour, IGraphPart
     {
         selectedSR = transform.GetChild(0).GetComponent<SpriteRenderer>();
         lineRenderer = GetComponent<LineRenderer>();
-        
-        leftEdgeEnd = transform.parent.GetChild(1).GetComponent<EdgeEnd>();
-        rightEdgeEnd = transform.parent.GetChild(2).GetComponent<EdgeEnd>();
+
+        positions = new Vector3[Settings.PlayerSettings.curvesQuality];
+
+        isSelected = false;
+        selectedSR.enabled = false;
     }
 
-    private void Start()
+    public void MyStart()
     {
         lineRenderer.positionCount = Settings.PlayerSettings.curvesQuality;
-        positions = new Vector3[Settings.PlayerSettings.curvesQuality];
-        leftEdgeEnd.onMove.AddListener(LockedMove);
-        rightEdgeEnd.onMove.AddListener(LockedMove);
-        DrawCurve();
-        UnSelect();
+        ((EdgeEnd)IDManager.GetGP(leftEdgeEnd)).onMove.AddListener(LockedMove);
+        ((EdgeEnd)IDManager.GetGP(rightEdgeEnd)).onMove.AddListener(LockedMove);
     }
 
-    private void DrawCurve()
+    public void DrawCurve()
     {
         for (int i = 0; i <= Settings.PlayerSettings.curvesQuality-1; i++)
         {
@@ -69,18 +107,18 @@ public class Edge : AccessBehaviour, IGraphPart
             Vector3 middlepoint = CalculateMiddlePoint();
             /*Debug.Log("Af = " + middlepoint);
             Debug.Log("Am = " + transform.position);
-            Debug.Log("A1 = " + pointLeft.transform.position);
-            Debug.Log("A2 = " + pointRight.transform.position);*/
-            positions[i] = GetPoint(leftEdgeEnd.position, middlepoint, rightEdgeEnd.position, t);
+            Debug.Log("A1 = " + leftEdgeEnd.transform.position);
+            Debug.Log("A2 = " + rightEdgeEnd.transform.position);*/
+            positions[i] = GetPoint(((EdgeEnd)IDManager.GetGP(leftEdgeEnd)).position, middlepoint, ((EdgeEnd)IDManager.GetGP(rightEdgeEnd)).position, t);
         }
         lineRenderer.SetPositions(positions);
-        leftEdgeEnd.TurnToVector(positions[1]);
-        rightEdgeEnd.TurnToVector(positions[Settings.PlayerSettings.curvesQuality-2]);
+        ((EdgeEnd)IDManager.GetGP(leftEdgeEnd)).TurnToVector(positions[1]);
+        ((EdgeEnd)IDManager.GetGP(rightEdgeEnd)).TurnToVector(positions[Settings.PlayerSettings.curvesQuality-2]);
     }
 
     private Vector3 CalculateMiddlePoint()
     {
-        return 2f * transform.position - (leftEdgeEnd.position + rightEdgeEnd.position) / 2f;
+        return 2f * transform.position - (((EdgeEnd)IDManager.GetGP(leftEdgeEnd)).position + ((EdgeEnd)IDManager.GetGP(rightEdgeEnd)).position) / 2f;
     }
 
     private Vector3 GetPoint(Vector3 p0, Vector3 pmiddle, Vector3 p1, float t)
@@ -94,11 +132,12 @@ public class Edge : AccessBehaviour, IGraphPart
         {
             this.Destroy();
         }
+        CheckColors();
     }
 
     private bool HaveConnection()
     {
-        return leftEdgeEnd.vertex != null || rightEdgeEnd.vertex != null;
+        return ((EdgeEnd)IDManager.GetGP(leftEdgeEnd)).GetVertex() != null || ((EdgeEnd)IDManager.GetGP(rightEdgeEnd)).GetVertex() != null;
     }
 
     public void CheckLock()
@@ -106,24 +145,24 @@ public class Edge : AccessBehaviour, IGraphPart
         if (ShouldBeLocked())
         {
             isLocked = true;
-            leftEdgeEnd.onMove.AddListener(LockedMove);
-            rightEdgeEnd.onMove.AddListener(LockedMove);
-            transform.position = (leftEdgeEnd.position + rightEdgeEnd.position) / 2f;
+            ((EdgeEnd)IDManager.GetGP(leftEdgeEnd)).onMove.AddListener(LockedMove);
+            ((EdgeEnd)IDManager.GetGP(rightEdgeEnd)).onMove.AddListener(LockedMove);
+            transform.position = (((EdgeEnd)IDManager.GetGP(leftEdgeEnd)).position + ((EdgeEnd)IDManager.GetGP(rightEdgeEnd)).position) / 2f;
             DrawCurve();
         }
         else
         {
             isLocked = false;
-            leftEdgeEnd.onMove.RemoveListener(LockedMove);
-            rightEdgeEnd.onMove.RemoveListener(LockedMove);
-            leftEdgeEnd.onMove.AddListener(DrawCurve);
-            rightEdgeEnd.onMove.AddListener(DrawCurve);
+            ((EdgeEnd)IDManager.GetGP(leftEdgeEnd)).onMove.RemoveListener(LockedMove);
+            ((EdgeEnd)IDManager.GetGP(rightEdgeEnd)).onMove.RemoveListener(LockedMove);
+            ((EdgeEnd)IDManager.GetGP(leftEdgeEnd)).onMove.AddListener(DrawCurve);
+            ((EdgeEnd)IDManager.GetGP(rightEdgeEnd)).onMove.AddListener(DrawCurve);
         }
     }
 
     private bool ShouldBeLocked()
     {
-        return (Vector3.Distance(leftEdgeEnd.transform.position, transform.position) + Vector3.Distance(transform.position, rightEdgeEnd.transform.position) - Vector3.Distance(leftEdgeEnd.transform.position, rightEdgeEnd.transform.position) < Settings.PlayerSettings.lockedSensitivity) ;
+        return (Vector3.Distance(((EdgeEnd)IDManager.GetGP(leftEdgeEnd)).transform.position, transform.position) + Vector3.Distance(transform.position, ((EdgeEnd)IDManager.GetGP(rightEdgeEnd)).transform.position) - Vector3.Distance(((EdgeEnd)IDManager.GetGP(leftEdgeEnd)).transform.position, ((EdgeEnd)IDManager.GetGP(rightEdgeEnd)).transform.position) < Settings.PlayerSettings.lockedSensitivity) ;
     }
 
     public void Remove(IGraphPart part) { return; }
@@ -141,7 +180,7 @@ public class Edge : AccessBehaviour, IGraphPart
     }
 
     public void LockedMove() { 
-        transform.position = (leftEdgeEnd.position + rightEdgeEnd.position) / 2f;
+        transform.position = (((EdgeEnd)IDManager.GetGP(leftEdgeEnd)).position + ((EdgeEnd)IDManager.GetGP(rightEdgeEnd)).position) / 2f;
         DrawCurve();
     }
 
@@ -149,6 +188,7 @@ public class Edge : AccessBehaviour, IGraphPart
     {
         isSelected = true;
         selectedSR.enabled = true;
+        /*
         if (leftVertex == null)
         {
             leftEdgeEnd.Select();
@@ -157,21 +197,22 @@ public class Edge : AccessBehaviour, IGraphPart
         {
             rightEdgeEnd.Select();
         }
+        */
     }
 
     public void ExpandedSelect()
     {
         Select();
-        leftEdgeEnd.ExpandedSelect();
-        rightEdgeEnd.ExpandedSelect();
+        ((EdgeEnd)IDManager.GetGP(leftEdgeEnd)).ExpandedSelect();
+        ((EdgeEnd)IDManager.GetGP(rightEdgeEnd)).ExpandedSelect();
     }
 
     public void UnSelect()
     {
         isSelected = false;
         selectedSR.enabled = false;
-        leftEdgeEnd.UnSelect();
-        rightEdgeEnd.UnSelect();
+        ((EdgeEnd)IDManager.GetGP(leftEdgeEnd)).UnSelect();
+        ((EdgeEnd)IDManager.GetGP(rightEdgeEnd)).UnSelect();
     }
 
     public void ChangeWidth(float widthValue)
@@ -198,41 +239,72 @@ public class Edge : AccessBehaviour, IGraphPart
     }
     public void StopMovement()
     {
-        CheckLock();
-        ControlVertices();
+        toStopMovement = 1;
     }
 
     public void ControlVertices()
     {
-        leftEdgeEnd.CheckVertex();
-        rightEdgeEnd.CheckVertex();
+        ((EdgeEnd)IDManager.GetGP(leftEdgeEnd)).CheckVertex();
+        ((EdgeEnd)IDManager.GetGP(rightEdgeEnd)).CheckVertex();
         CheckConnections();
+        CheckColors();
+    }
+
+    public void CheckColors()
+    {
+        int num = 0;
+        num += (((EdgeEnd)IDManager.GetGP(leftEdgeEnd)).GetVertex() != null) ? 1 : 0;
+        num += (((EdgeEnd)IDManager.GetGP(rightEdgeEnd)).GetVertex() != null) ? 1 : 0;
+        if(num == 1)
+        {
+            lineRenderer.colorGradient = colorOneConnected;
+        } else
+        {
+            lineRenderer.colorGradient = colorTwoConnected;
+        }
     }
 
     public void Destroy()
     {
-        leftEdgeEnd.Destroy();
-        rightEdgeEnd.Destroy();
+        ((EdgeEnd)IDManager.GetGP(leftEdgeEnd)).Destroy();
+        ((EdgeEnd)IDManager.GetGP(rightEdgeEnd)).Destroy();
         Destroy(transform.parent.gameObject);
     }
 
     public float GetBiggestX()
     {
-        return Mathf.Max(leftEdgeEnd.GetWorldPos().x, rightEdgeEnd.GetWorldPos().x, GetWorldPos().x);
+        return Mathf.Max(((EdgeEnd)IDManager.GetGP(leftEdgeEnd)).GetWorldPos().x, ((EdgeEnd)IDManager.GetGP(rightEdgeEnd)).GetWorldPos().x, GetWorldPos().x);
     }
 
     public float GetSmallestX()
     {
-        return Mathf.Min(leftEdgeEnd.GetWorldPos().x, rightEdgeEnd.GetWorldPos().x, GetWorldPos().x);
+        return Mathf.Min(((EdgeEnd)IDManager.GetGP(leftEdgeEnd)).GetWorldPos().x, ((EdgeEnd)IDManager.GetGP(rightEdgeEnd)).GetWorldPos().x, GetWorldPos().x);
     }
 
     public float GetBiggestY()
     {
-        return Mathf.Max(leftEdgeEnd.GetWorldPos().y, rightEdgeEnd.GetWorldPos().y, GetWorldPos().y);
+        return Mathf.Max(((EdgeEnd)IDManager.GetGP(leftEdgeEnd)).GetWorldPos().y, ((EdgeEnd)IDManager.GetGP(rightEdgeEnd)).GetWorldPos().y, GetWorldPos().y);
     }
 
     public float GetSmallestY()
     {
-        return Mathf.Min(leftEdgeEnd.GetWorldPos().x, rightEdgeEnd.GetWorldPos().x, GetWorldPos().x);
+        return Mathf.Min(((EdgeEnd)IDManager.GetGP(leftEdgeEnd)).GetWorldPos().x, ((EdgeEnd)IDManager.GetGP(rightEdgeEnd)).GetWorldPos().x, GetWorldPos().x);
+    }
+
+    public Vector2 GetNumOfVerticesAndEdges()
+    {
+        return new Vector2(0, 1);
+    }
+
+    public List<Vertex> GetVertices()
+    {
+        return new List<Vertex>();
+    }
+
+    public List<Edge> GetEdges()
+    {
+        List<Edge> edges = new List<Edge>();
+        edges.Add(this);
+        return edges;
     }
 }

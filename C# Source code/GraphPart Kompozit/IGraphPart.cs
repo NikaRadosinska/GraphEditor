@@ -22,4 +22,9 @@ public interface IGraphPart
     float GetSmallestX();
     float GetBiggestY();
     float GetSmallestY();
+    Vector2 GetNumOfVerticesAndEdges();
+    List<Vertex> GetVertices();
+    List<Edge> GetEdges();
+    void SetID(int id);
+    int GetID();
 }

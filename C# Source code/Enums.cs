@@ -7,11 +7,13 @@ public enum GraphPartType
     SUBGRAPH = 3,
 }
 
-public enum ControlStrategyType
+public enum ControlStateType
 {
     CLASSIC = 0,
     SHIFT = 1,
     CTRL = 2,
     ADD = 3,
+    HOLD = 4,
+    EMPTY = 5,
 }
 

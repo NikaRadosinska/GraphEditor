@@ -4,39 +4,48 @@ using UnityEngine;
 
 public class SubGraph : IGraphPart
 {
-    public List<IGraphPart> subParts;
+    public List<int> subParts;
 
     public SubGraph()
     {
-        subParts = new List<IGraphPart>();
+        subParts = new List<int>();
     }
 
     public void Add(IGraphPart part)
     {
-        subParts.Add(part);
+        if(part.GetGraphPartType() == GraphPartType.SUBGRAPH)
+        {
+            Debug.LogError("Trying add subgraph to graph");
+        }
+
+        if (subParts.Contains(part.GetID()))
+        {
+            return;
+        }
+        subParts.Add(part.GetID());
     }
 
     public void Remove(IGraphPart part)
     {
-        if (!subParts.Remove(part)) //neni medzi subParts
+        if (!subParts.Remove(part.GetID())) //neni medzi subParts
         {
-            foreach (IGraphPart gp in subParts)
+            foreach (int gp in subParts)
             {
-                gp.Remove(part);
+                IDManager.GetGP(gp).Remove(part);
             }
         }
     }
 
     public void Clear()
     {
-        subParts = new List<IGraphPart>();
+        subParts = new List<int>();
     }
 
     public void ChangeWidth(float widthValue)
     {
-        foreach (IGraphPart gp in subParts)
+        foreach (int gp in subParts)
         {
-            gp.ChangeWidth(widthValue);
+            IDManager.GetGP(gp).ChangeWidth(widthValue);
         }
     }
 
@@ -47,7 +56,12 @@ public class SubGraph : IGraphPart
 
     public List<IGraphPart> GetGraphPartsInList()
     {
-        return subParts;
+        List<IGraphPart> list = new List<IGraphPart>();
+        foreach (int gp in subParts)
+        {
+            list.Add(IDManager.GetGP(gp));
+        }
+        return list;
     }
 
     public void Init(Vector3 spawnPosition, GraphPartType graphPartType)
@@ -57,50 +71,50 @@ public class SubGraph : IGraphPart
 
     public void MoveBy(Vector3 delta)
     {
-        foreach (IGraphPart gp in subParts)
+        foreach (int gp in subParts)
         {
-            gp.MoveBy(delta);
+            IDManager.GetGP(gp).MoveBy(delta);
         }
     }
 
     public void MoveAt(Vector3 position)
     {
-        foreach (IGraphPart gp in subParts)
+        foreach (int gp in subParts)
         {
-            gp.MoveAt(position);
+            IDManager.GetGP(gp).MoveAt(position);
         }
     }
 
     public void Select()
     {
-        foreach (IGraphPart gp in subParts)
+        foreach (int gp in subParts)
         {
-            gp.Select();
+            IDManager.GetGP(gp).Select();
         }
     }
 
     public void ExpandedSelect()
     {
-        foreach (IGraphPart gp in subParts)
+        foreach (int gp in subParts)
         {
-            gp.ExpandedSelect();
+            IDManager.GetGP(gp).ExpandedSelect();
         }
     }
 
     public void UnSelect()
     {
-        foreach (IGraphPart gp in subParts)
+        foreach (int gp in subParts)
         {
-            gp.UnSelect();
+            IDManager.GetGP(gp).UnSelect();
         }
     }
 
     public bool isContainingGraphPart(IGraphPart part)
     {
         bool returnValue = false;
-        foreach (IGraphPart gp in subParts)
+        foreach (int gp in subParts)
         {
-            returnValue = returnValue || gp.isContainingGraphPart(part);
+            returnValue = returnValue || IDManager.GetGP(gp).isContainingGraphPart(part);
         }
         return returnValue;
     }
@@ -111,9 +125,9 @@ public class SubGraph : IGraphPart
     }
     public void StopMovement()
     {
-        foreach (IGraphPart gp in subParts)
+        foreach (int gp in subParts)
         {
-            gp.StopMovement();
+            IDManager.GetGP(gp).StopMovement();
         }
     }
 
@@ -129,23 +143,24 @@ public class SubGraph : IGraphPart
 
     public void Destroy()
     {
-        foreach (IGraphPart gp in subParts)
+        foreach (int gp in subParts)
         {
-            if (gp.GetGraphPartType() == GraphPartType.EDGE_END)
-                gp.UnSelect();
-            gp.Destroy();
+            if (IDManager.GetGP(gp).GetGraphPartType() == GraphPartType.EDGE_END)
+                IDManager.GetGP(gp).UnSelect();
+            else IDManager.GetGP(gp).Destroy();
         }
-        subParts = new List<IGraphPart>();
+        subParts = new List<int>();
     }
 
     public float GetBiggestX()
     {
         float biggestX = float.MinValue;
-        foreach (IGraphPart gp in subParts)
+        foreach (int gp in subParts)
         {
-            if (gp.GetBiggestX() > biggestX)
+            float value = IDManager.GetGP(gp).GetBiggestX();
+            if (value > biggestX)
             {
-                biggestX = gp.GetBiggestX();
+                biggestX = value;
             }
         }
         return biggestX;
@@ -154,11 +169,12 @@ public class SubGraph : IGraphPart
     public float GetSmallestX()
     {
         float smallestX = float.MaxValue;
-        foreach (IGraphPart gp in subParts)
+        foreach (int gp in subParts)
         {
-            if (gp.GetSmallestX() < smallestX)
+            float value = IDManager.GetGP(gp).GetSmallestX();
+            if (value < smallestX)
             {
-                smallestX = gp.GetBiggestX();
+                smallestX = value;
             }
         }
         return smallestX;
@@ -167,11 +183,12 @@ public class SubGraph : IGraphPart
     public float GetBiggestY()
     {
         float biggestY = float.MinValue;
-        foreach (IGraphPart gp in subParts)
+        foreach (int gp in subParts)
         {
-            if (gp.GetBiggestY() > biggestY)
+            float value = IDManager.GetGP(gp).GetBiggestY();
+            if (value > biggestY)
             {
-                biggestY = gp.GetBiggestX();
+                biggestY = value;
             }
         }
         return biggestY;
@@ -180,13 +197,54 @@ public class SubGraph : IGraphPart
     public float GetSmallestY()
     {
         float smallestY = float.MaxValue;
-        foreach (IGraphPart gp in subParts)
+        foreach (int gp in subParts)
         {
-            if (gp.GetSmallestY() < smallestY)
+            float value = IDManager.GetGP(gp).GetSmallestY();
+            if (value < smallestY)
             {
-                smallestY = gp.GetBiggestX();
+                smallestY = value;
             }
         }
         return smallestY;
+    }
+
+    public Vector2 GetNumOfVerticesAndEdges()
+    {
+        Vector2 v2 = new Vector2(0,0);
+        foreach (int gp in subParts)
+        {
+            v2 += IDManager.GetGP(gp).GetNumOfVerticesAndEdges();
+        }
+        return v2;
+    }
+
+    public List<Vertex> GetVertices()
+    {
+        List<Vertex> vertices = new List<Vertex>();
+        foreach (int gp in subParts)
+        {
+            vertices.AddRange(IDManager.GetGP(gp).GetVertices());
+        }
+        return vertices;
+    }
+
+    public List<Edge> GetEdges()
+    {
+        List<Edge> edges = new List<Edge>();
+        foreach (int gp in subParts)
+        {
+            edges.AddRange(IDManager.GetGP(gp).GetEdges());
+        }
+        return edges;
+    }
+
+    public int GetID()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public void SetID(int id)
+    {
+        throw new System.NotImplementedException();
     }
 }

@@ -6,8 +6,14 @@ using UnityEngine.Serialization;
 
 public class EdgeEnd : MonoBehaviour, IGraphPart
 {
-    private Edge edgeMid;
-    public Vertex vertex = null;
+    private int ID;
+    private int toStopMovement;
+
+    private int edgeMid;   
+    public void SetMidId(int midId) { edgeMid = midId; }
+    public Edge GetMid() {  return (Edge)IDManager.GetGP(edgeMid); }
+    [SerializeField]
+    private int vertex;
     private bool isSelected = false;
     private SpriteRenderer selectedSR;
     public Vector3 position { get { return transform.position; } }
@@ -24,20 +30,45 @@ public class EdgeEnd : MonoBehaviour, IGraphPart
 
     private void Awake()
     {
-        edgeMid = transform.parent.GetChild(0).GetComponentInParent<Edge>();
         selectedSR = transform.GetChild(0).GetComponent<SpriteRenderer>();
+        selectedSR.enabled = false;
+        isSelected = false;
+        gameObject.tag = "Collectorable";
     }
 
     void Start()
     {
-        UnSelect();
-        if (vertex != null)
+        if (vertex != 0)
         {
-            transform.position = vertex.GetWorldPos();
+            transform.position = IDManager.GetGP(vertex).GetWorldPos();
         }
     }
 
-    public Vertex GetOtherVertex(Vertex vertex) { return edgeMid.GetOtherVertex(vertex); }
+    private void LateUpdate()
+    {
+        if (toStopMovement == 2)
+        {
+            GetMid().StopMovement();
+            CheckVertex();
+
+            toStopMovement = 0;
+        } else if (toStopMovement == 1)
+        {
+            toStopMovement++;
+        }
+    }
+
+    public int GetID()
+    {
+        return ID;
+    }
+
+    public void SetID(int id)
+    {
+        ID = id;
+    }
+
+    public Vertex GetOtherVertex(Vertex vertex) { return ((Edge)IDManager.GetGP(edgeMid)).GetOtherVertex(vertex); }
 
     public void ChangeWidth(float widthValue)
     {
@@ -79,6 +110,7 @@ public class EdgeEnd : MonoBehaviour, IGraphPart
             if (selected.GetGraphPartType() == GraphPartType.VERTEX)
             {
                 AttachVertex((Vertex)selected);
+                MoveAt(selected.GetWorldPos());
             }
         }
         else
@@ -92,23 +124,32 @@ public class EdgeEnd : MonoBehaviour, IGraphPart
         RemoveVertex();
     }
 
+    public Vertex GetVertex()
+    {
+        return (Vertex)IDManager.GetGP(vertex);
+    }
+
     public void RemoveVertex()
     {
+        Vertex vertex = (Vertex)IDManager.GetGP(this.vertex);
         if (vertex != null)
         {
-            vertex.RemoveEdge(this);
-            vertex = null;
-            edgeMid.CheckConnections();
+            vertex.RemoveEdge(ID);
+            this.vertex = 0;
+            GetMid().CheckConnections();
+            gameObject.tag = "Collectorable";
         }
     }
 
     public void AttachVertex(Vertex vertex)
     {
-        if (this.vertex != null)
+        Vertex _vertex = (Vertex)IDManager.GetGP(this.vertex);
+
+        if (_vertex != null)
         {
-            if (this.vertex != vertex)
+            if (_vertex != vertex)
             {
-                this.vertex.RemoveEdge(this);
+                _vertex.RemoveEdge(ID);
             } 
             else
             {
@@ -116,9 +157,11 @@ public class EdgeEnd : MonoBehaviour, IGraphPart
                 return;
             }
         }
-        this.vertex = vertex;
-        vertex.AddEdge(this);
+        this.vertex = vertex.ID;
+        gameObject.tag = "Untagged";
+        vertex.AddEdge(ID);
         transform.position = vertex.position;
+        GetMid().DrawCurve();
     }
 
     public void Remove(IGraphPart part) { return; }
@@ -132,12 +175,16 @@ public class EdgeEnd : MonoBehaviour, IGraphPart
     public void ExpandedSelect()
     {
         Select();
-        edgeMid.Select();
+        GetMid().Select();
     }
 
     public void UnSelect()
     {
         if (isOneSelected())
+        {
+            return;
+        }
+        if(selectedSR == null)
         {
             return;
         }
@@ -147,7 +194,9 @@ public class EdgeEnd : MonoBehaviour, IGraphPart
 
     private bool areBothSelected()
     {
-        if (!edgeMid.GetIsSelected())
+        Vertex vertex = (Vertex)IDManager.GetGP(this.vertex);
+
+        if (!GetMid().GetIsSelected())
         {
             //return false;
         }
@@ -163,6 +212,8 @@ public class EdgeEnd : MonoBehaviour, IGraphPart
 
     private bool isOneSelected()
     {
+        Vertex vertex = (Vertex)IDManager.GetGP(this.vertex);
+
         if (vertex != null)
         {
             if (vertex.GetIsSelected())
@@ -174,7 +225,7 @@ public class EdgeEnd : MonoBehaviour, IGraphPart
                 return false;
             }
         }
-        if (edgeMid.GetIsSelected())
+        if (GetMid().GetIsSelected())
         {
             return true;
         }
@@ -189,8 +240,7 @@ public class EdgeEnd : MonoBehaviour, IGraphPart
     }
     public void StopMovement()
     {
-        edgeMid.CheckLock();
-        CheckVertex();
+        toStopMovement = 1;
     }
 
     public void TurnToVector(Vector3 vector)
@@ -223,5 +273,20 @@ public class EdgeEnd : MonoBehaviour, IGraphPart
     public float GetSmallestY()
     {
         return transform.position.y;
+    }
+
+    public Vector2 GetNumOfVerticesAndEdges()
+    {
+        return Vector2.zero;
+    }
+
+    public List<Vertex> GetVertices()
+    {
+        return new List<Vertex>();
+    }
+
+    public List<Edge> GetEdges()
+    {
+        return new List<Edge>();
     }
 }

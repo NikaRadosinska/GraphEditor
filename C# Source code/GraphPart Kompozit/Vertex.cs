@@ -4,9 +4,15 @@ using UnityEngine;
 
 public class Vertex : MonoBehaviour, IGraphPart
 {
+    public string Name;
+
+    public int ID;
+
+    private bool toStopMovement;
+
     private SpriteRenderer selectedSR;
 
-    public List<EdgeEnd> edges = new List<EdgeEnd>();
+    public List<int> edgeIDs = new List<int>();
 
     public bool isSelected;
 
@@ -15,10 +21,30 @@ public class Vertex : MonoBehaviour, IGraphPart
     private void Awake()
     {
         selectedSR = transform.GetChild(0).GetComponent<SpriteRenderer>();
+        isSelected = false;
+        selectedSR.enabled = false;
     }
-    private void Start()
+
+    private void LateUpdate()
     {
-        UnSelect();
+        if (toStopMovement)
+        {
+            List<int> edgeIDs = new List<int>(this.edgeIDs);
+            foreach (int ee in edgeIDs)
+            {
+                ((EdgeEnd)IDManager.GetGP(ee)).StopMovement();
+            }
+            toStopMovement = false;
+        }   
+    }
+
+    public int GetID()
+    {
+        return ID;
+    }
+    public void SetID(int id)
+    {
+        ID = id;
     }
 
     public void ChangeWidth(float widthValue)
@@ -26,26 +52,21 @@ public class Vertex : MonoBehaviour, IGraphPart
         transform.localScale = new Vector3(widthValue,widthValue,1);
     }
 
-    public void Init(Vector3 spawnPosition, GraphPartType graphPartType)
-    {
-        /////////////////////////////////////
-    }
-
     public void MoveBy(Vector3 delta)
     {
         transform.position += delta; 
-        foreach (EdgeEnd edge in edges)
+        foreach (int edge in edgeIDs)
         {
-            edge.MoveBy(delta);
+            IDManager.GetGP(edge).MoveBy(delta);
         }
     }
 
     public void MoveAt(Vector3 position)
     {
         transform.position = position;
-        foreach (EdgeEnd edge in edges)
+        foreach (int edge in edgeIDs)
         {
-            edge.MoveAt(position);
+            (IDManager.GetGP(edge)).MoveAt(position);
         }
     }
 
@@ -53,9 +74,9 @@ public class Vertex : MonoBehaviour, IGraphPart
     {
         selectedSR.enabled = true;
         isSelected = true;
-        foreach (EdgeEnd edge in edges)
+        foreach (int edge in edgeIDs)
         {
-            edge.Select();
+            (IDManager.GetGP(edge)).Select();
         }
     }
 
@@ -63,9 +84,9 @@ public class Vertex : MonoBehaviour, IGraphPart
     {
         isSelected = false;
         selectedSR.enabled = false;
-        foreach (EdgeEnd edge in edges)
+        foreach (int edge in edgeIDs)
         {
-            edge.UnSelect();
+            IDManager.GetGP(edge).UnSelect();
         }
     }
 
@@ -75,26 +96,24 @@ public class Vertex : MonoBehaviour, IGraphPart
     public bool GetIsSelected() { return isSelected; }
     public GraphPartType GetGraphPartType() { return GraphPartType.VERTEX; }
 
-    public void AddEdge(EdgeEnd edgeEnd)
+    public void AddEdge(int edgeEnd)
     {
-        if (edges.Contains(edgeEnd))
+        if (edgeIDs.Contains(edgeEnd))
             return;
-        edges.Add(edgeEnd);
+        edgeIDs.Add(edgeEnd);
     }
 
-    public void RemoveEdge(EdgeEnd edgeEnd)
+    public void RemoveEdge(int edgeEnd)
     {
-        edges.Remove(edgeEnd);
+        edgeIDs.Remove(edgeEnd);
     }
 
     public List<Vertex> outgoingEdgesDestination()
     {
         List<Vertex> outgoingEdges = new List<Vertex>();
-        foreach (EdgeEnd e in edges)
+        foreach (int e in edgeIDs)
         {
-            Vertex v = e.GetOtherVertex(this);
-            if (v == null)
-                continue;
+            Vertex v = ((EdgeEnd)IDManager.GetGP(e)).GetOtherVertex(this);
             outgoingEdges.Add(v);
         }
         return outgoingEdges;
@@ -105,9 +124,9 @@ public class Vertex : MonoBehaviour, IGraphPart
     public void ExpandedSelect()
     {
         Select();
-        foreach (EdgeEnd e in edges)
+        foreach (int e in edgeIDs)
         {
-            e.ExpandedSelect();
+            ((EdgeEnd)IDManager.GetGP(e)).ExpandedSelect();
         }
     }
 
@@ -117,18 +136,18 @@ public class Vertex : MonoBehaviour, IGraphPart
     }
     public void StopMovement()
     {
-        return;
+        toStopMovement = true;
     }
 
     public void Destroy()
     {
         isSelected = false;
         GetComponent<Collider2D>().enabled = false;
-        List<EdgeEnd> es = new List<EdgeEnd>(edges);
-        foreach (EdgeEnd e in es)
+        List<int> es = new List<int>(edgeIDs);
+        foreach (int e in es)
         {
-            e.UnSelect();
-            e.RemoveVertex();
+            ((EdgeEnd)IDManager.GetGP(e)).UnSelect();
+            ((EdgeEnd)IDManager.GetGP(e)).RemoveVertex();
         }
         Destroy(gameObject);
     }
@@ -151,6 +170,23 @@ public class Vertex : MonoBehaviour, IGraphPart
     public float GetSmallestY()
     {
         return transform.position.y;
+    }
+
+    public Vector2 GetNumOfVerticesAndEdges()
+    {
+        return new Vector2(1, 0);
+    }
+
+    public List<Vertex> GetVertices()
+    {
+        List<Vertex> vertices = new List<Vertex>();
+        vertices.Add(this);
+        return vertices;
+    }
+
+    public List<Edge> GetEdges()
+    {
+        return new List<Edge>();
     }
 }
 
